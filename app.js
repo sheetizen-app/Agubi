@@ -78,6 +78,9 @@
         const reviewSection = document.getElementById('review-section');
         const showRecommendationsBtn = document.getElementById('show-recommendations-btn');
         const backToMainBtn = document.getElementById('back-to-main-btn');
+        const switchToStudentFromLoginBtn = document.getElementById('switch-to-student-from-login');
+        const switchToTeacherFromStudentBtn = document.getElementById('switch-to-teacher-from-student');
+        const switchToStudentFromTeacherBtn = document.getElementById('switch-to-student-from-teacher');
         const publicReviewListContainer = document.getElementById('public-review-list-container');
         const publicReviewSearch = document.getElementById('public-review-search');
         const publicReviewRatingFilter = document.getElementById('public-review-rating-filter');
@@ -1371,6 +1374,24 @@
             createSchoolForm.addEventListener('submit', handleCreateSchool);
             document.getElementById('login-form').addEventListener('submit', handleTeacherLogin);
             document.getElementById('school-code-form').addEventListener('submit', handleSchoolCodeVerification);
+
+            switchToStudentFromLoginBtn.addEventListener('click', () => {
+                showView('student');
+                resetStudentVerificationForm();
+                populateKelasOptions();
+            });
+
+            switchToTeacherFromStudentBtn.addEventListener('click', () => {
+                loginSchoolContext.classList.remove('hidden');
+                loginSchoolNameSpan.textContent = currentSekolahName;
+                showView('login');
+            });
+
+            switchToStudentFromTeacherBtn.addEventListener('click', () => {
+                resetStudentVerificationForm();
+                populateKelasOptions();
+                showView('student');
+            });
 
             // Student flow
             kelasSelect.addEventListener('change', (e) => loadStudentNames(e.target.value));
