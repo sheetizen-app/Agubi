@@ -152,7 +152,16 @@
         
         // --- Alur Utama Aplikasi & Autentikasi ---
         async function initializeApp() {
+
+            supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true
+                }
+            });
+
             supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
             
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'SIGNED_IN') {
@@ -929,7 +938,11 @@
 
             importSchoolIdDisplay.textContent = `Sekolah ID: ${currentSekolahId || 'N/A'}`;
 
+
             importSchoolIdDisplay.textContent = `Sekolah ID: ${currentSekolahId || 'N/A'}`;
+
+            importSchoolIdDisplay.textContent = `Sekolah ID: ${currentSekolahId || 'N/A'}`;
+
 
             let tableHTML = `<table class="w-full text-sm text-left text-gray-500"><thead class="text-xs text-gray-700 uppercase bg-gray-50"><tr><th scope="col" class="px-4 py-2">NIS</th><th scope="col" class="px-4 py-2">Nama</th><th scope="col" class="px-4 py-2">Kelas</th></tr></thead><tbody>`;
             students.forEach(student => {
@@ -992,7 +1005,7 @@
                 confirmImportBtn.disabled = false;
                 confirmImportBtn.innerHTML = '<i class="fa-solid fa-check-circle mr-2"></i> Konfirmasi & Impor';
             }
-=======
+
             const { error } = await supabaseClient
                 .from('Siswa')
                 .upsert(dataToImport, { onConflict: 'sekolah_id,nis' });
@@ -1076,8 +1089,12 @@
             };
 
 
+            reader.readAsText(file, 'UTF-8');
+
+
             reader.readAsText(file, 'UTF-8')
             reader.readAsText(file);
+
 
         }
 
