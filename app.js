@@ -109,6 +109,7 @@
         const importStatus = document.getElementById('import-status');
         const importPreviewContainer = document.getElementById('import-preview-container');
         const importPreviewTable = document.getElementById('import-preview-table');
+
         const importSchoolIdDisplay = document.getElementById('import-school-id');
         const confirmImportBtn = document.getElementById('confirm-import-btn');
         const cancelImportBtn = document.getElementById('cancel-import-btn');
@@ -915,6 +916,7 @@
             importPreviewContainer.classList.add('hidden');
             importCsvInput.value = '';
             importSchoolIdDisplay.textContent = '';
+
         }
 
         function cancelImportProcess() {
@@ -924,7 +926,9 @@
         }
 
         function renderImportPreview(students) {
+
             importSchoolIdDisplay.textContent = `Sekolah ID: ${currentSekolahId || 'N/A'}`;
+
             let tableHTML = `<table class="w-full text-sm text-left text-gray-500"><thead class="text-xs text-gray-700 uppercase bg-gray-50"><tr><th scope="col" class="px-4 py-2">NIS</th><th scope="col" class="px-4 py-2">Nama</th><th scope="col" class="px-4 py-2">Kelas</th></tr></thead><tbody>`;
             students.forEach(student => {
                 tableHTML += `<tr class="bg-white border-b"><td class="px-4 py-2 font-medium text-gray-900">${student.nis}</td><td class="px-4 py-2">${student.nama}</td><td class="px-4 py-2">${student.kelas}</td></tr>`;
