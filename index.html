@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGUBI - Asisten Guru Bahasa Indonesia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .teacher-stat-card {
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .teacher-stat-card i { font-size: 2rem; color: #16a34a; }
+        .student-stat-card {
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .student-stat-card i { font-size: 1.75rem; color: #16a34a; }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .achievement-badge img {
+            width: 48px;
+            height: 48px;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+        .achievement-badge .emoji {
+            font-size: 2.5rem;
+        }
+        .expandable-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out;
+        }
+        .expandable-content.show {
+            max-height: 500px; /* Adjust as needed */
+        }
+        /* Style untuk Tab Aktif */
+        .tab-btn.active {
+            background-color: white;
+            color: #2563eb; /* blue-600 */
+            font-weight: 600;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div id="app-container" class="container mx-auto p-4 md:p-6 max-w-4xl">
+        
+        <!-- ===== Tampilan Login untuk Guru (Tidak Berubah) ===== -->
+        <div id="login-view" class="hidden">
+            <div class="bg-white p-8 rounded-xl shadow-lg max-w-md mx-auto">
+                <h1 class="text-2xl font-bold text-center text-gray-700 mb-2">Login Guru</h1>
+                <p class="text-center text-gray-500 mb-6">Masukkan kredensial untuk mengakses dasbor.</p>
+                <form id="login-form">
+                    <div class="mb-4">
+                        <label for="email" class="block text-sm font-medium text-gray-600 mb-1">Email</label>
+                        <input type="email" id="email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="password" class="block text-sm font-medium text-gray-600 mb-1">Password</label>
+                        <input type="password" id="password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300">Login</button>
+                    <p id="login-error" class="text-red-500 text-sm mt-4 text-center"></p>
+                </form>
+                <button id="switch-to-student" class="w-full mt-4 text-sm text-blue-600 hover:underline">Masuk sebagai Murid</button>
+            </div>
+        </div>
+
+        <!-- ===== Tampilan Murid (Tidak Berubah) ===== -->
+        <div id="student-view">
+            <header class="text-center mb-8">
+                <div class="inline-block bg-green-600 text-white p-3 rounded-full mb-4">
+                    <i class="fa-solid fa-book-open fa-2x"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800">AGUBI - Portal Siswa</h1>
+                <p class="text-gray-500 mt-1">Asisten Guru Bahasa Indonesia - Catat progres membacamu!</p>
+            </header>
+
+            <div id="student-form-container" class="bg-white p-6 md:p-8 rounded-xl shadow-md max-w-lg mx-auto fade-in">
+                <div id="verification-section">
+                    <h2 class="text-xl font-semibold mb-1 flex items-center"><i class="fa-solid fa-user-check mr-2 text-blue-500"></i> Verifikasi Data Diri</h2>
+                    <p class="text-sm text-gray-500 mb-6">Masukkan data untuk memulai.</p>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="kelas" class="block text-sm font-medium text-gray-600 mb-1">Kelas</label>
+                            <select id="kelas" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50" required></select>
+                        </div>
+                        <div>
+                            <label for="nama-siswa" class="block text-sm font-medium text-gray-600 mb-1">Nama Siswa</label>
+                            <select id="nama-siswa" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-50" required disabled></select>
+                        </div>
+                        <div>
+                            <label for="nis" class="block text-sm font-medium text-gray-600 mb-1">NIS (sebagai password)</label>
+                            <input type="password" id="nis" placeholder="Masukkan NIS kamu" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                    </div>
+                    <button id="check-data-button" class="w-full mt-6 bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 transition duration-300">Cek Data</button>
+                    <p id="verification-message" class="mt-3 text-sm text-center"></p>
+                </div>
+                
+                <div id="progress-form-section" class="hidden">
+                    <h2 class="text-xl font-semibold mb-1 flex items-center"><i class="fa-solid fa-book-medical mr-2 text-green-500"></i> Input Progres Baca</h2>
+                    <p class="text-sm text-gray-500 mb-6">Hai <span id="student-name-display" class="font-bold"></span>! Lanjutkan kebiasaan baikmu.</p>
+                    <form id="student-form" class="space-y-4">
+                        <div>
+                            <label for="judul-buku" class="block text-sm font-medium text-gray-600 mb-1">Judul Buku</label>
+                            <input type="text" id="judul-buku" placeholder="Contoh: Laskar Pelangi" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="halaman-awal" class="block text-sm font-medium text-gray-600 mb-1">Halaman Awal</label>
+                                <input type="number" id="halaman-awal" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+                            <div>
+                                <label for="halaman-akhir" class="block text-sm font-medium text-gray-600 mb-1">Halaman Akhir</label>
+                                <input type="number" id="halaman-akhir" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="deskripsi" class="block text-sm font-medium text-gray-600 mb-1">Deskripsi Singkat Bacaan</label>
+                            <textarea id="deskripsi" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" required></textarea>
+                        </div>
+                        <button type="submit" id="submit-button" class="w-full bg-green-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-green-700 transition duration-300">Simpan Progres</button>
+                        <p id="student-message" class="mt-3 text-sm text-center"></p>
+                    </form>
+                </div>
+            </div>
+
+            <div id="student-dashboard-section" class="hidden max-w-lg mx-auto mt-8 space-y-6">
+                <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-md">
+                    <div>
+                        <p class="text-sm text-gray-500">Selamat Datang,</p>
+                        <p id="dashboard-student-name" class="font-bold text-lg"></p>
+                    </div>
+                    <button id="logout-student-button" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-lg transition duration-300">
+                        <i class="fa-solid fa-right-from-bracket mr-2"></i>Ganti Siswa
+                    </button>
+                </div>
+
+                <div id="new-achievement-toast" class="hidden p-4 rounded-lg bg-yellow-400 text-black font-bold text-center"></div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="student-stat-card">
+                        <div><p class="text-sm text-gray-500">Total Halaman</p><p id="student-stat-total-halaman" class="text-3xl font-bold">0</p></div><i class="fa-solid fa-book-open"></i>
+                    </div>
+                    <div class="student-stat-card">
+                        <div><p class="text-sm text-gray-500">Buku Dibaca</p><p id="student-stat-buku-dibaca" class="text-3xl font-bold">0</p></div><i class="fa-solid fa-star" style="color: #f59e0b;"></i>
+                    </div>
+                </div>
+                 <div class="student-stat-card">
+                    <div><p class="text-sm text-gray-500">Kecepatan Rata-rata</p><p id="student-stat-kecepatan" class="text-3xl font-bold">0</p><p class="text-xs text-gray-500">halaman/hari</p></div><i class="fa-solid fa-chart-line"></i>
+                </div>
+
+                <div id="student-achievement-section" class="bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="text-lg font-semibold mb-4">Achievement Kamu</h3>
+                    <div id="student-achievement-list" class="grid grid-cols-2 sm:grid-cols-3 gap-4"></div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="text-lg font-semibold mb-4">Grafik Progres Mingguan</h3>
+                    <canvas id="student-chart"></canvas>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="text-lg font-semibold mb-4">Histori Membaca</h3>
+                    <div id="history-table-container" class="space-y-3"></div>
+                </div>
+                
+                <button id="report-again-button" class="w-full bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 transition duration-300">
+                    <i class="fa-solid fa-plus mr-2"></i> Lapor Progres Lagi
+                </button>
+            </div>
+
+            <div class="text-center mt-8">
+                <button id="switch-to-teacher" class="text-sm text-gray-500 hover:text-blue-600 hover:underline">Masuk sebagai Guru</button>
+            </div>
+        </div>
+
+        <!-- ===== Tampilan Dasbor Guru ===== -->
+        <div id="teacher-view" class="hidden">
+             <div class="flex justify-between items-center mb-6">
+                <h1 class="text-3xl font-bold text-gray-800">Dasbor Performa Literasi</h1>
+                <button id="logout-button" class="bg-red-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-600">Logout</button>
+            </div>
+            <div id="teacher-loader" class="flex justify-center items-center py-8 hidden"><div class="loader"></div></div>
+            <div id="teacher-dashboard-content" class="space-y-8">
+                <!-- Statistik Utama (Tidak Berubah) -->
+                <div class="bg-white p-4 rounded-xl shadow-lg flex flex-wrap gap-4 items-center">
+                    <div>
+                        <label for="teacher-filter-kelas" class="font-medium mr-2">Filter Kelas:</label>
+                        <select id="teacher-filter-kelas" class="px-4 py-2 border border-gray-300 rounded-lg"></select>
+                    </div>
+                    <div>
+                        <label for="teacher-filter-month" class="font-medium mr-2">Top Performer Bulan:</label>
+                        <select id="teacher-filter-month" class="px-4 py-2 border border-gray-300 rounded-lg"></select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="teacher-stat-card">
+                        <div><p class="text-sm text-gray-500">Total Siswa</p><p id="stat-total-siswa" class="text-3xl font-bold">0</p></div><i class="fa-solid fa-users"></i>
+                    </div>
+                    <div class="teacher-stat-card">
+                        <div><p class="text-sm text-gray-500">Total Halaman</p><p id="stat-total-halaman" class="text-3xl font-bold">0</p></div><i class="fa-solid fa-book-open"></i>
+                    </div>
+                    <div class="teacher-stat-card">
+                        <div><p class="text-sm text-gray-500">Rata-rata Halaman</p><p id="stat-rata-halaman" class="text-3xl font-bold">0</p></div><i class="fa-solid fa-chart-bar"></i>
+                    </div>
+                    <div class="teacher-stat-card">
+                        <div><p class="text-sm text-gray-500">Kecepatan Rata-rata</p><p id="stat-kecepatan" class="text-3xl font-bold">0</p><p class="text-xs text-gray-500">halaman/hari</p></div><i class="fa-solid fa-chart-line"></i>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-lg">
+                        <h2 class="text-xl font-bold mb-4 flex items-center"><i class="fa-solid fa-trophy mr-2 text-yellow-500"></i> Top Performers</h2>
+                        <ol id="top-performers-list" class="list-decimal list-inside space-y-3"></ol>
+                    </div>
+                    <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
+                        <h2 class="text-xl font-bold mb-4 flex items-center"><i class="fa-solid fa-chart-pie mr-2 text-blue-500"></i> Insight Kelas</h2>
+                        <div id="class-insights-container" class="space-y-4"></div>
+                    </div>
+                </div>
+
+                <!-- DIPERBARUI: Manajemen Siswa dengan Tab -->
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h2 class="text-2xl font-bold mb-4">Manajemen Siswa</h2>
+                    <!-- Tombol Tab -->
+                    <div class="flex border-b border-gray-200">
+                        <button id="student-list-tab-btn" class="tab-btn py-2 px-4 -mb-px text-gray-500 hover:text-blue-600 active">Daftar Siswa</button>
+                        <button id="add-student-tab-btn" class="tab-btn py-2 px-4 text-gray-500 hover:text-blue-600">Tambah Siswa</button>
+                        <button id="import-student-tab-btn" class="tab-btn py-2 px-4 text-gray-500 hover:text-blue-600">Impor Siswa</button>
+                    </div>
+
+                    <!-- Konten Tab: Daftar Siswa -->
+                    <div id="student-list-tab" class="mt-4">
+                        <input type="text" id="student-list-search" placeholder="Cari nama siswa..." class="w-full md:w-1/3 px-3 py-2 border border-gray-300 rounded-lg mb-4">
+                        <div class="overflow-x-auto border rounded-lg">
+                            <table class="w-full text-sm text-left text-gray-500">
+                                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3">NIS</th>
+                                        <th scope="col" class="px-4 py-3">Nama</th>
+                                        <th scope="col" class="px-4 py-3">Kelas</th>
+                                        <th scope="col" class="px-4 py-3 text-center">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="student-list-table-body">
+                                    <!-- Data siswa akan dimuat di sini oleh JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Konten Tab: Tambah Siswa -->
+                    <div id="add-student-tab" class="hidden mt-4">
+                        <form id="add-student-form" class="max-w-md space-y-4">
+                            <div>
+                                <label for="add-nis" class="block text-sm font-medium text-gray-600 mb-1">NIS (Nomor Induk Siswa)</label>
+                                <input type="text" id="add-nis" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                            </div>
+                             <div>
+                                <label for="add-nama" class="block text-sm font-medium text-gray-600 mb-1">Nama Lengkap</label>
+                                <input type="text" id="add-nama" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                            </div>
+                             <div>
+                                <label for="add-kelas" class="block text-sm font-medium text-gray-600 mb-1">Kelas</label>
+                                <input type="text" id="add-kelas" class="w-full px-3 py-2 border border-gray-300 rounded-lg" required>
+                            </div>
+                            <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700">Simpan Siswa</button>
+                            <p id="add-student-message" class="text-sm text-center"></p>
+                        </form>
+                    </div>
+
+                    <!-- Konten Tab: Impor Siswa -->
+                    <div id="import-student-tab" class="hidden mt-4">
+                        <p class="text-sm text-gray-600 mb-4">
+                            Untuk menambahkan siswa secara massal, unduh template CSV, isi data siswa, lalu impor kembali ke sistem.
+                            Pastikan kolom <code class="bg-gray-200 p-1 rounded-sm">nis</code> unik untuk setiap siswa.
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                            <div>
+                                <button id="download-template-btn" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-300">
+                                    <i class="fa-solid fa-download mr-2"></i> Unduh Template CSV
+                                </button>
+                            </div>
+                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                                 <label for="import-csv-input" class="w-full cursor-pointer bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300">
+                                    <i class="fa-solid fa-upload mr-2"></i> Pilih File CSV
+                                 </label>
+                                 <input type="file" id="import-csv-input" class="hidden" accept=".csv">
+                                 <p id="import-status" class="text-sm mt-2 text-gray-500">Belum ada file dipilih.</p>
+                            </div>
+                        </div>
+                        <div id="import-preview-container" class="hidden mt-6">
+                            <h3 class="text-lg font-semibold mb-2">Pratinjau Data Impor</h3>
+                            <p class="text-sm text-gray-600 mb-4">Silakan periksa data di bawah ini. Jika sudah benar, klik "Konfirmasi & Impor".</p>
+                            <div id="import-preview-table" class="overflow-x-auto border rounded-lg max-h-60"></div>
+                            <div class="mt-4 flex flex-col sm:flex-row gap-4">
+                                <button id="confirm-import-btn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">
+                                    <i class="fa-solid fa-check-circle mr-2"></i> Konfirmasi & Impor
+                                </button>
+                                <button id="cancel-import-btn" class="w-full bg-gray-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600">
+                                    <i class="fa-solid fa-times-circle mr-2"></i> Batal
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manajemen Achievement (Tidak Berubah) -->
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h2 class="text-2xl font-bold mb-4">Manajemen Achievement</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h3 class="text-lg font-semibold mb-2" id="form-ach-title">Buat Achievement Baru</h3>
+                            <div class="flex border border-gray-200 rounded-lg p-1 bg-gray-100 mb-4">
+                                <button id="manual-ach-tab" class="w-1/2 py-2 rounded-md bg-white shadow text-blue-600 font-semibold">Manual</button>
+                                <button id="auto-ach-tab" class="w-1/2 py-2 rounded-md text-gray-500">Otomatis</button>
+                            </div>
+                            <form id="create-achievement-form" class="space-y-3"></form>
+                            <h3 class="text-lg font-semibold mt-6 mb-2">Daftar Achievement</h3>
+                            <ul id="achievement-list" class="space-y-2"></ul>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold mb-2">Berikan Achievement Manual</h3>
+                            <form id="award-achievement-form" class="space-y-3">
+                                <select id="award-class-select" class="w-full px-3 py-2 border rounded-lg"><option value="semua">Semua Kelas</option></select>
+                                <input type="text" id="award-student-search" placeholder="Ketik nama siswa..." class="w-full px-3 py-2 border rounded-lg">
+                                <select id="award-student-select" class="w-full px-3 py-2 border rounded-lg" required><option>Pilih Siswa</option></select>
+                                <select id="award-achievement-select" class="w-full px-3 py-2 border rounded-lg" required><option>Pilih Achievement</option></select>
+                                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg">Berikan</button>
+                                <p id="award-message" class="text-sm text-center"></p>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Progres Siswa (Tidak Berubah) -->
+                <div class="bg-white p-6 rounded-xl shadow-lg overflow-x-auto">
+                     <div class="flex flex-wrap gap-4 items-center mb-4">
+                        <h2 class="text-xl font-bold">Data Progres Siswa</h2>
+                        <div class="flex-grow flex flex-wrap gap-4 items-center justify-end">
+                            <select id="progress-table-filter-kelas" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"><option value="semua">Semua Kelas</option></select>
+                            <input type="date" id="progress-table-filter-start-date" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
+                            <input type="date" id="progress-table-filter-end-date" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
+                            <button id="progress-table-apply-filter" class="bg-blue-500 text-white px-4 py-1.5 rounded-lg text-sm">Terapkan</button>
+                            <button id="progress-table-reset-filter" class="bg-gray-200 px-4 py-1.5 rounded-lg text-sm">Reset</button>
+                        </div>
+                     </div>
+                     <table class="w-full text-sm text-left text-gray-500">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3">Tanggal</th><th scope="col" class="px-6 py-3">Siswa</th><th scope="col" class="px-6 py-3">Buku</th><th scope="col" class="px-6 py-3">Progres Halaman</th><th scope="col" class="px-6 py-3">Deskripsi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teacher-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <button id="switch-to-student-from-teacher" class="w-full mt-6 text-sm text-blue-600 hover:underline">Kembali ke Halaman Murid</button>
+        </div>
+    </div>
+
+    <script type="module">
+        // ===== KONFIGURASI (WAJIB DIISI!) =====
+        const SUPABASE_URL = 'https://cabsvhmbveeguooakihk.supabase.co'; // Ganti dengan Project URL Anda
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNhYnN2aG1idmVlZ3Vvb2FraWhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE4MTg3OTgsImV4cCI6MjA2NzM5NDc5OH0.93PpewGRpF054cMvvk3Se_QkvvlWC-q3tY0M4jnmenw'; // Ganti dengan kunci anon public Anda
+        // =======================================
+
+        const { createClient } = supabase;
+        let supabaseClient;
+        let verifiedNis = null;
+        let verifiedName = null;
+        let studentChartInstance = null;
+        let currentAchievementForm = 'manual';
+        let editingAchievementId = null;
+        let studentsToImportPreview = [];
+        let editingStudentNis = null; // DIPERBARUI: Lacak siswa yang sedang diedit
+
+        // Elemen DOM
+        const appContainer = document.getElementById('app-container');
+        const loginView = document.getElementById('login-view');
+        const studentView = document.getElementById('student-view');
+        const teacherView = document.getElementById('teacher-view');
+        const kelasSelect = document.getElementById('kelas');
+        const namaSiswaSelect = document.getElementById('nama-siswa');
+        const nisInput = document.getElementById('nis');
+        const checkDataButton = document.getElementById('check-data-button');
+        const verificationMessage = document.getElementById('verification-message');
+        const studentFormContainer = document.getElementById('student-form-container');
+        const progressFormSection = document.getElementById('progress-form-section');
+        const studentForm = document.getElementById('student-form');
+        const studentNameDisplay = document.getElementById('student-name-display');
+        const studentMessage = document.getElementById('student-message');
+        const studentDashboardSection = document.getElementById('student-dashboard-section');
+        const dashboardStudentName = document.getElementById('dashboard-student-name');
+        const logoutStudentButton = document.getElementById('logout-student-button');
+        const historyTableContainer = document.getElementById('history-table-container');
+        const newAchievementToast = document.getElementById('new-achievement-toast');
+        const studentStatTotalHalaman = document.getElementById('student-stat-total-halaman');
+        const studentStatBukuDibaca = document.getElementById('student-stat-buku-dibaca');
+        const studentStatKecepatan = document.getElementById('student-stat-kecepatan');
+        const reportAgainButton = document.getElementById('report-again-button');
+        const studentAchievementList = document.getElementById('student-achievement-list');
+        const logoutButton = document.getElementById('logout-button');
+        const teacherDashboardContent = document.getElementById('teacher-dashboard-content');
+        const teacherTableBody = document.getElementById('teacher-table-body');
+        const teacherFilterKelas = document.getElementById('teacher-filter-kelas');
+        const teacherFilterMonth = document.getElementById('teacher-filter-month');
+        const teacherLoader = document.getElementById('teacher-loader');
+        const statTotalSiswa = document.getElementById('stat-total-siswa');
+        const statTotalHalaman = document.getElementById('stat-total-halaman');
+        const statRataHalaman = document.getElementById('stat-rata-halaman');
+        const statKecepatan = document.getElementById('stat-kecepatan');
+        const topPerformersList = document.getElementById('top-performers-list');
+        const classInsightsContainer = document.getElementById('class-insights-container');
+        // Elemen Manajemen Achievement
+        const createAchievementForm = document.getElementById('create-achievement-form');
+        const formAchTitle = document.getElementById('form-ach-title');
+        const manualAchTab = document.getElementById('manual-ach-tab');
+        const autoAchTab = document.getElementById('auto-ach-tab');
+        const achievementList = document.getElementById('achievement-list');
+        const awardAchievementForm = document.getElementById('award-achievement-form');
+        const awardClassSelect = document.getElementById('award-class-select');
+        const awardStudentSearch = document.getElementById('award-student-search');
+        const awardStudentSelect = document.getElementById('award-student-select');
+        const awardAchievementSelect = document.getElementById('award-achievement-select');
+        const awardMessage = document.getElementById('award-message');
+        // Elemen Progres Siswa
+        const progressTableFilterKelas = document.getElementById('progress-table-filter-kelas');
+        const progressTableFilterStartDate = document.getElementById('progress-table-filter-start-date');
+        const progressTableFilterEndDate = document.getElementById('progress-table-filter-end-date');
+        const progressTableApplyFilter = document.getElementById('progress-table-apply-filter');
+        const progressTableResetFilter = document.getElementById('progress-table-reset-filter');
+        // DIPERBARUI: Elemen Manajemen Siswa
+        const studentListTabBtn = document.getElementById('student-list-tab-btn');
+        const addStudentTabBtn = document.getElementById('add-student-tab-btn');
+        const importStudentTabBtn = document.getElementById('import-student-tab-btn');
+        const studentListTab = document.getElementById('student-list-tab');
+        const addStudentTab = document.getElementById('add-student-tab');
+        const importStudentTab = document.getElementById('import-student-tab');
+        const studentListSearch = document.getElementById('student-list-search');
+        const studentListTableBody = document.getElementById('student-list-table-body');
+        const addStudentForm = document.getElementById('add-student-form');
+        const addStudentMessage = document.getElementById('add-student-message');
+        const downloadTemplateBtn = document.getElementById('download-template-btn');
+        const importCsvInput = document.getElementById('import-csv-input');
+        const importStatus = document.getElementById('import-status');
+        const importPreviewContainer = document.getElementById('import-preview-container');
+        const importPreviewTable = document.getElementById('import-preview-table');
+        const confirmImportBtn = document.getElementById('confirm-import-btn');
+        const cancelImportBtn = document.getElementById('cancel-import-btn');
+
+        // ===== LOGIKA UTAMA & ROUTING =====
+        function showView(viewName) {
+            loginView.classList.add('hidden');
+            studentView.classList.add('hidden');
+            teacherView.classList.add('hidden');
+            if (viewName === 'login') loginView.classList.remove('hidden');
+            if (viewName === 'student') studentView.classList.remove('hidden');
+            if (viewName === 'teacher') teacherView.classList.remove('hidden');
+        }
+        
+        async function checkUserSession() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                showView('teacher');
+                loadTeacherDashboard();
+            } else {
+                showView('student');
+                populateKelasOptions();
+            }
+        }
+
+        document.getElementById('switch-to-student').addEventListener('click', () => showView('student'));
+        document.getElementById('switch-to-teacher').addEventListener('click', () => showView('login'));
+        document.getElementById('switch-to-student-from-teacher').addEventListener('click', () => showView('student'));
+
+        // ===== LOGIKA MURID (Tidak Berubah) =====
+        
+        async function populateKelasOptions() {
+            const { data, error } = await supabaseClient.from('Siswa').select('kelas', { count: 'exact', head: true });
+            if (error && error.code === '42P01') {
+                showDbError();
+                return;
+            }
+
+            const { data: classData, error: classError } = await supabaseClient.from('Siswa').select('kelas');
+            if (classError) { console.error("Gagal memuat data kelas:", classError); return; }
+            const classes = [...new Set(classData.map(s => s.kelas))].sort();
+            kelasSelect.innerHTML = '<option value="">Pilih Kelas Kamu</option>';
+            classes.forEach(c => kelasSelect.innerHTML += `<option value="${c}">${c}</option>`);
+        }
+
+        async function loadStudentNames(kelas) {
+            namaSiswaSelect.innerHTML = '<option value="">Memuat...</option>';
+            namaSiswaSelect.disabled = true;
+            const { data, error } = await supabaseClient.from('Siswa').select('nama').eq('kelas', kelas).order('nama');
+            if (error) { console.error("Gagal memuat nama siswa:", error); namaSiswaSelect.innerHTML = '<option value="">Gagal memuat</option>'; return; }
+            namaSiswaSelect.innerHTML = '<option value="">Pilih Nama Kamu</option>';
+            data.forEach(s => namaSiswaSelect.innerHTML += `<option value="${s.nama}">${s.nama}</option>`);
+            namaSiswaSelect.disabled = false;
+        }
+
+        kelasSelect.addEventListener('change', (e) => {
+            const selectedKelas = e.target.value;
+            if (selectedKelas) loadStudentNames(selectedKelas);
+            else {
+                namaSiswaSelect.innerHTML = '<option value="">Pilih kelas terlebih dahulu</option>';
+                namaSiswaSelect.disabled = true;
+            }
+        });
+        
+        checkDataButton.addEventListener('click', async () => {
+            const nama = namaSiswaSelect.value;
+            const nis = nisInput.value;
+            verificationMessage.textContent = 'Memverifikasi...';
+            const { data, error } = await supabaseClient.from('Siswa').select('nis, nama').eq('nama', nama).eq('nis', nis).single();
+            if (error || !data) {
+                verificationMessage.textContent = 'Verifikasi Gagal. Periksa kembali data Anda.';
+                verificationMessage.className = 'mt-3 text-sm text-center text-red-500';
+            } else {
+                verifiedNis = data.nis;
+                verifiedName = data.nama;
+                studentFormContainer.classList.add('hidden');
+                loadStudentDashboard();
+            }
+        });
+
+        studentForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitButton = document.getElementById('submit-button');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Menyimpan...';
+            const halamanAwal = parseInt(document.getElementById('halaman-awal').value);
+            const halamanAkhir = parseInt(document.getElementById('halaman-akhir').value);
+            if (halamanAkhir <= halamanAwal) {
+                 studentMessage.innerHTML = `<p class="text-red-500">Halaman akhir harus lebih besar dari halaman awal.</p>`;
+                 submitButton.disabled = false;
+                 submitButton.textContent = 'Simpan Progres';
+                 return;
+            }
+            const { data: newProgress, error } = await supabaseClient.from('ProgresBaca').insert({
+                nis_siswa: verifiedNis, judul_buku: document.getElementById('judul-buku').value, halaman_awal: halamanAwal, halaman_akhir: halamanAkhir, deskripsi: document.getElementById('deskripsi').value, halaman_dibaca: halamanAkhir - halamanAwal,
+            }).select().single();
+
+            if (error) {
+                studentMessage.innerHTML = `<p class="text-red-500">Gagal menyimpan. Error: ${error.message}</p>`;
+            } else {
+                await checkAndAwardAutomaticAchievements(verifiedNis, newProgress);
+                studentForm.reset();
+                studentFormContainer.classList.add('hidden');
+                loadStudentDashboard();
+            }
+            submitButton.disabled = false;
+            submitButton.textContent = 'Simpan Progres';
+        });
+
+        async function loadStudentDashboard() {
+            studentDashboardSection.classList.remove('hidden');
+            studentDashboardSection.classList.add('fade-in');
+            dashboardStudentName.textContent = verifiedName;
+            
+            const { data: myProgress, error } = await supabaseClient.from('ProgresBaca').select('*').eq('nis_siswa', verifiedNis).order('created_at', { ascending: false });
+            if (error) { console.error("Gagal memuat histori:", error); return; }
+            
+            const totalHalaman = myProgress.reduce((sum, p) => sum + p.halaman_dibaca, 0);
+            const bukuDibaca = new Set(myProgress.map(p => p.judul_buku)).size;
+            let kecepatan = 0;
+            if (myProgress.length > 0) {
+                const firstDate = new Date(Math.min(...myProgress.map(e => new Date(e.created_at))));
+                const days = Math.max(1, (new Date() - firstDate) / (1000 * 3600 * 24));
+                kecepatan = (totalHalaman / days).toFixed(1);
+            }
+            studentStatTotalHalaman.textContent = totalHalaman.toLocaleString('id-ID');
+            studentStatBukuDibaca.textContent = bukuDibaca;
+            studentStatKecepatan.textContent = kecepatan;
+
+            renderStudentChart(myProgress);
+            renderStudentAchievements();
+            
+            historyTableContainer.innerHTML = '';
+            if (myProgress.length > 0) {
+                myProgress.forEach(item => {
+                    historyTableContainer.innerHTML += `<div class="border-b border-gray-200 pb-3"><div class="flex justify-between items-start"><p class="font-semibold text-gray-800">${item.judul_buku}</p><p class="text-sm text-gray-500">${new Date(item.created_at).toLocaleDateString('id-ID', {day:'numeric', month:'short'})}</p></div><p class="text-sm text-gray-600 mt-1">${item.deskripsi}</p><div class="flex justify-between items-center mt-2"><span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">Halaman ${item.halaman_awal} → ${item.halaman_akhir}</span><span class="text-sm font-bold text-green-600">+${item.halaman_dibaca} halaman</span></div></div>`;
+                });
+            } else {
+                historyTableContainer.innerHTML = `<p class="text-center text-sm text-gray-500 py-4">Kamu belum punya histori baca. Ayo mulai membaca!</p>`;
+            }
+        }
+        
+        function renderStudentChart(progressData) {
+            const ctx = document.getElementById('student-chart').getContext('2d');
+            if (studentChartInstance) studentChartInstance.destroy();
+            const weeklyData = progressData.reduce((acc, item) => {
+                const date = new Date(item.created_at);
+                const startOfWeek = new Date(date.setDate(date.getDate() - date.getDay() + 1)).toISOString().split('T')[0];
+                if (!acc[startOfWeek]) acc[startOfWeek] = { pages: 0, books: new Set() };
+                acc[startOfWeek].pages += item.halaman_dibaca;
+                acc[startOfWeek].books.add(item.judul_buku);
+                return acc;
+            }, {});
+            const sortedWeeks = Object.keys(weeklyData).sort();
+            const labels = sortedWeeks.map(week => `Minggu ${new Date(week).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}`);
+            const pagesData = sortedWeeks.map(week => weeklyData[week].pages);
+            const booksData = sortedWeeks.map(week => weeklyData[week].books.size);
+            studentChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels: labels, datasets: [{ label: 'Halaman Dibaca', data: pagesData, borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.3, yAxisID: 'yPages' }, { label: 'Buku Dibaca', data: booksData, borderColor: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.1)', fill: false, tension: 0.3, yAxisID: 'yBooks', stepped: true }] },
+                options: { responsive: true, scales: { yPages: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Jumlah Halaman' } }, yBooks: { type: 'linear', display: true, position: 'right', title: { display: true, text: 'Jumlah Buku' }, grid: { drawOnChartArea: false }, ticks: { stepSize: 1 } } } }
+            });
+        }
+
+        async function renderStudentAchievements() {
+            const { data, error } = await supabaseClient.from('PencapaianSiswa').select('Achievements (*)').eq('nis_siswa', verifiedNis);
+            if (error) { console.error("Gagal memuat achievements:", error); return; }
+            studentAchievementList.innerHTML = '';
+            if (data.length > 0) {
+                data.forEach(item => {
+                    const achievement = item.Achievements;
+                    if (achievement) {
+                        const icon = achievement.gambar_url ? `<img src="${achievement.gambar_url}" alt="${achievement.nama_achievement}">` : `<span class="emoji">${achievement.emoji}</span>`;
+                        studentAchievementList.innerHTML += `
+                            <div class="text-center p-3 bg-gray-50 rounded-lg achievement-badge cursor-pointer">
+                                ${icon}
+                                <p class="text-xs font-semibold mt-1">${achievement.nama_achievement}</p>
+                                <div class="expandable-content text-xs text-gray-500 mt-1">${achievement.kriteria}</div>
+                            </div>
+                        `;
+                    }
+                });
+                document.querySelectorAll('#student-achievement-list .achievement-badge').forEach(badge => {
+                    badge.addEventListener('click', () => {
+                        badge.querySelector('.expandable-content').classList.toggle('show');
+                    });
+                });
+            } else {
+                studentAchievementList.innerHTML = `<p class="col-span-full text-center text-sm text-gray-500 py-4">Kamu belum punya achievement. Teruslah membaca!</p>`;
+            }
+        }
+        
+        reportAgainButton.addEventListener('click', () => {
+            studentDashboardSection.classList.add('hidden');
+            studentFormContainer.classList.remove('hidden');
+            studentFormContainer.classList.add('fade-in');
+            document.getElementById('verification-section').classList.add('hidden');
+            progressFormSection.classList.remove('hidden');
+            studentNameDisplay.textContent = verifiedName;
+            newAchievementToast.classList.add('hidden');
+        });
+
+        logoutStudentButton.addEventListener('click', () => {
+            verifiedNis = null;
+            verifiedName = null;
+            studentDashboardSection.classList.add('hidden');
+            studentFormContainer.classList.remove('hidden');
+            studentFormContainer.classList.add('fade-in');
+            document.getElementById('verification-section').classList.remove('hidden');
+            progressFormSection.classList.add('hidden');
+            nisInput.value = '';
+            verificationMessage.textContent = '';
+            kelasSelect.value = '';
+            namaSiswaSelect.innerHTML = '<option value="">Pilih kelas terlebih dahulu</option>';
+            namaSiswaSelect.disabled = true;
+            newAchievementToast.classList.add('hidden');
+        });
+
+        // ===== LOGIKA GURU =====
+        let allProgressData = [];
+        let allStudentData = [];
+        let allAchievements = [];
+        let allPencapaianSiswa = [];
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const { error } = await supabaseClient.auth.signInWithPassword({ email: document.getElementById('email').value, password: document.getElementById('password').value });
+            if (error) { document.getElementById('login-error').textContent = 'Login gagal: ' + error.message; } 
+            else { checkUserSession(); }
+        });
+        logoutButton.addEventListener('click', async () => {
+            await supabaseClient.auth.signOut();
+            showView('student');
+        });
+        async function loadTeacherDashboard() {
+            teacherLoader.classList.remove('hidden');
+            teacherDashboardContent.classList.add('hidden');
+            
+            const [progressRes, studentRes, achievementRes, pencapaianRes] = await Promise.all([
+                supabaseClient.from('ProgresBaca').select('*, Siswa (nama, kelas)'),
+                supabaseClient.from('Siswa').select('*'),
+                supabaseClient.from('Achievements').select('*'),
+                supabaseClient.from('PencapaianSiswa').select('*')
+            ]);
+
+            if (studentRes.error && studentRes.error.code === '42P01') {
+                showDbError();
+                return;
+            }
+
+            if (progressRes.error || studentRes.error || achievementRes.error || pencapaianRes.error) { console.error('Gagal memuat data dasbor'); return; }
+            
+            allStudentData = studentRes.data;
+            allProgressData = progressRes.data;
+            allAchievements = achievementRes.data;
+            allPencapaianSiswa = pencapaianRes.data;
+
+            teacherLoader.classList.add('hidden');
+            teacherDashboardContent.classList.remove('hidden');
+            
+            const classes = ['semua', ...[...new Set(allStudentData.map(s => s.kelas))].sort()];
+            teacherFilterKelas.innerHTML = '';
+            classes.forEach(c => teacherFilterKelas.innerHTML += `<option value="${c}">${c === 'semua' ? 'Semua Kelas' : c}</option>`);
+            awardClassSelect.innerHTML = '<option value="semua">Semua Kelas</option>';
+            progressTableFilterKelas.innerHTML = '<option value="semua">Semua Kelas</option>';
+            classes.slice(1).forEach(c => {
+                awardClassSelect.innerHTML += `<option value="${c}">${c}</option>`;
+                progressTableFilterKelas.innerHTML += `<option value="${c}">${c}</option>`;
+            });
+
+            setupEventListeners();
+            
+            renderAchievementManagement();
+            updateDashboard();
+            renderProgressTable();
+            renderStudentList();
+        }
+
+        // DIPERBARUI: Mengelompokkan semua event listener
+        function setupEventListeners() {
+             // Listener untuk tab manajemen siswa
+            studentListTabBtn.addEventListener('click', () => showStudentManagementTab('list'));
+            addStudentTabBtn.addEventListener('click', () => showStudentManagementTab('add'));
+            importStudentTabBtn.addEventListener('click', () => showStudentManagementTab('import'));
+            
+            // Listener untuk form dan input
+            addStudentForm.addEventListener('submit', handleAddStudentSubmit);
+            studentListSearch.addEventListener('input', () => renderStudentList());
+            
+            // Listener untuk impor
+            downloadTemplateBtn.addEventListener('click', downloadCSVTemplate);
+            importCsvInput.addEventListener('change', handleImportCSV);
+            confirmImportBtn.addEventListener('click', confirmAndImportData);
+            cancelImportBtn.addEventListener('click', cancelImportProcess);
+        }
+
+        function populateMonthFilter(data) {
+            const months = [...new Set(data.map(p => new Date(p.created_at).toISOString().slice(0, 7)))].sort().reverse();
+            teacherFilterMonth.innerHTML = '<option value="semua">Semua Waktu</option>';
+            months.forEach(month => {
+                const date = new Date(month + '-02');
+                const monthName = date.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
+                teacherFilterMonth.innerHTML += `<option value="${month}">${monthName}</option>`;
+            });
+        }
+        
+        function updateDashboard() {
+            const selectedKelas = teacherFilterKelas.value;
+            const classFilteredData = selectedKelas === 'semua' ? allProgressData : allProgressData.filter(d => d.Siswa && d.Siswa.kelas === selectedKelas);
+            
+            populateMonthFilter(classFilteredData);
+            renderMainStats(classFilteredData);
+            updateTopPerformers();
+        }
+        
+        function updateTopPerformers() {
+            const selectedKelas = teacherFilterKelas.value;
+            const selectedMonth = teacherFilterMonth.value;
+
+            let filteredData = selectedKelas === 'semua' ? allProgressData : allProgressData.filter(d => d.Siswa && d.Siswa.kelas === selectedKelas);
+            if (selectedMonth !== 'semua') {
+                filteredData = filteredData.filter(d => d.created_at.startsWith(selectedMonth));
+            }
+
+            const studentTotals = filteredData.reduce((acc, d) => {
+                acc[d.nis_siswa] = (acc[d.nis_siswa] || 0) + d.halaman_dibaca;
+                return acc;
+            }, {});
+
+            const sortedStudents = Object.entries(studentTotals)
+                .map(([nis, total]) => ({ ...allStudentData.find(s=>s.nis===nis), total }))
+                .filter(s => s.nama) // Pastikan siswa masih ada
+                .sort((a, b) => b.total - a.total)
+                .slice(0, 5);
+
+            topPerformersList.innerHTML = '';
+            if (sortedStudents.length > 0) {
+                sortedStudents.forEach((s, index) => {
+                    topPerformersList.innerHTML += `<li class="flex justify-between items-center text-sm"><div class="flex items-center"><span class="inline-block text-center rounded-full bg-gray-200 mr-3" style="width:24px; height:24px; line-height:24px;">${index+1}</span>${s.nama} <span class="text-xs text-gray-500 ml-1">(${s.kelas})</span></div><span class="font-bold text-gray-600">${s.total.toLocaleString('id-ID')} hal</span></li>`;
+                });
+            } else { topPerformersList.innerHTML = `<p class="text-sm text-gray-500">Tidak ada data untuk periode ini.</p>`; }
+        }
+
+        function renderMainStats(data) {
+            const filterKelas = teacherFilterKelas.value;
+            const totalSiswaDatabase = filterKelas === 'semua' ? allStudentData.length : allStudentData.filter(s => s.kelas === filterKelas).length;
+            statTotalSiswa.textContent = totalSiswaDatabase;
+            
+            const totalSiswaAktif = new Set(data.map(d => d.nis_siswa)).size;
+            const totalHalaman = data.reduce((sum, d) => sum + d.halaman_dibaca, 0);
+            const rataRataHalaman = totalSiswaAktif > 0 ? (totalHalaman / totalSiswaAktif).toFixed(0) : 0;
+            let kecepatanRataRata = 0;
+            if(data.length > 0) {
+                const firstDate = new Date(Math.min(...data.map(e => new Date(e.created_at))));
+                const days = Math.max(1, (new Date() - firstDate) / (1000 * 3600 * 24));
+                kecepatanRataRata = (totalHalaman / days).toFixed(0);
+            }
+            statTotalHalaman.textContent = totalHalaman.toLocaleString('id-ID');
+            statRataHalaman.textContent = parseFloat(rataRataHalaman).toLocaleString('id-ID');
+            statKecepatan.textContent = parseFloat(kecepatanRataRata).toLocaleString('id-ID');
+            
+            const classTotals = allProgressData.reduce((acc, d) => {
+                if (!d.Siswa) return acc;
+                const kelas = d.Siswa.kelas;
+                if (!acc[kelas]) acc[kelas] = { totalHalaman: 0, siswa: new Set(), firstDate: new Date(d.created_at) };
+                acc[kelas].totalHalaman += d.halaman_dibaca;
+                acc[kelas].siswa.add(d.nis_siswa);
+                if (new Date(d.created_at) < acc[kelas].firstDate) acc[kelas].firstDate = new Date(d.created_at);
+                return acc;
+            }, {});
+            const maxPages = Math.max(1, ...Object.values(classTotals).map(c => c.totalHalaman));
+            classInsightsContainer.innerHTML = '';
+            const allDbClasses = [...new Set(allStudentData.map(s => s.kelas))].sort();
+            allDbClasses.forEach(kelas => {
+                const stats = classTotals[kelas];
+                const totalSiswaDiKelas = allStudentData.filter(s => s.kelas === kelas).length;
+                if (stats) {
+                    const days = Math.max(1, (new Date() - stats.firstDate) / (1000 * 3600 * 24));
+                    const pagesPerDay = (stats.totalHalaman / days).toFixed(1);
+                    const progressWidth = (stats.totalHalaman / maxPages) * 100;
+                    classInsightsContainer.innerHTML += `<div><div class="flex justify-between items-center mb-1"><p class="font-semibold">Kelas ${kelas} <span class="text-sm font-normal text-gray-500">(${totalSiswaDiKelas} siswa)</span></p><span class="text-sm bg-green-100 text-green-700 px-2 py-0.5 rounded-full">${pagesPerDay} hal/hari</span></div><div class="w-full bg-gray-200 rounded-full h-2.5"><div class="bg-blue-600 h-2.5 rounded-full" style="width: ${progressWidth}%"></div></div><p class="text-right text-sm text-gray-600 mt-1">${stats.totalHalaman.toLocaleString('id-ID')} halaman</p></div>`;
+                } else { classInsightsContainer.innerHTML += `<div><div class="flex justify-between items-center mb-1"><p class="font-semibold">Kelas ${kelas} <span class="text-sm font-normal text-gray-500">(${totalSiswaDiKelas} siswa)</span></p></div><div class="w-full bg-gray-200 rounded-full h-2.5"><div class="bg-gray-400 h-2.5 rounded-full" style="width: 0%"></div></div><p class="text-right text-sm text-gray-600 mt-1">0 halaman</p></div>`; }
+            });
+        }
+        
+        teacherFilterKelas.addEventListener('change', updateDashboard);
+        teacherFilterMonth.addEventListener('change', updateTopPerformers);
+        progressTableApplyFilter.addEventListener('click', renderProgressTable);
+        progressTableResetFilter.addEventListener('click', () => {
+            progressTableFilterKelas.value = 'semua';
+            progressTableFilterStartDate.value = '';
+            progressTableFilterEndDate.value = '';
+            renderProgressTable();
+        });
+
+        function renderProgressTable() {
+            const selectedKelas = progressTableFilterKelas.value;
+            const startDate = progressTableFilterStartDate.value;
+            const endDate = progressTableFilterEndDate.value;
+            
+            let filteredData = [...allProgressData];
+
+            if (selectedKelas !== 'semua') {
+                filteredData = filteredData.filter(p => p.Siswa && p.Siswa.kelas === selectedKelas);
+            }
+            if (startDate) {
+                filteredData = filteredData.filter(p => new Date(p.created_at) >= new Date(startDate));
+            }
+            if (endDate) {
+                const endOfDay = new Date(endDate);
+                endOfDay.setHours(23, 59, 59, 999);
+                filteredData = filteredData.filter(p => new Date(p.created_at) <= endOfDay);
+            }
+
+            teacherTableBody.innerHTML = '';
+            const sortedData = filteredData.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+            if (sortedData.length > 0) {
+                sortedData.forEach(item => {
+                    if (item.Siswa) {
+                        teacherTableBody.innerHTML += `<tr class="bg-white border-b hover:bg-gray-50"><td class="px-6 py-4">${new Date(item.created_at).toLocaleString('id-ID', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}</td><td class="px-6 py-4 font-medium text-gray-900">${item.Siswa.nama}<br><span class="text-xs bg-gray-200 px-1.5 py-0.5 rounded">${item.Siswa.kelas}</span></td><td class="px-6 py-4">${item.judul_buku}</td><td class="px-6 py-4 text-center"><span class="font-bold">${item.halaman_dibaca} hal</span><br><span class="text-xs text-gray-500">(${item.halaman_awal} → ${item.halaman_akhir})</span></td><td class="px-6 py-4 text-sm text-gray-600">${item.deskripsi}</td></tr>`;
+                    }
+                });
+            } else { teacherTableBody.innerHTML = `<tr><td colspan="5" class="text-center p-8">Tidak ada data untuk filter ini.</td></tr>`; }
+        }
+
+        // ===== DIPERBARUI: Fungsi Manajemen Siswa (CRUD & Impor) =====
+
+        function showStudentManagementTab(tabName) {
+            // Sembunyikan semua konten tab
+            studentListTab.classList.add('hidden');
+            addStudentTab.classList.add('hidden');
+            importStudentTab.classList.add('hidden');
+            // Hapus kelas aktif dari semua tombol tab
+            studentListTabBtn.classList.remove('active');
+            addStudentTabBtn.classList.remove('active');
+            importStudentTabBtn.classList.remove('active');
+
+            // Tampilkan tab yang dipilih
+            if (tabName === 'list') {
+                studentListTab.classList.remove('hidden');
+                studentListTabBtn.classList.add('active');
+            } else if (tabName === 'add') {
+                addStudentTab.classList.remove('hidden');
+                addStudentTabBtn.classList.add('active');
+            } else if (tabName === 'import') {
+                importStudentTab.classList.remove('hidden');
+                importStudentTabBtn.classList.add('active');
+            }
+        }
+
+        async function handleAddStudentSubmit(e) {
+            e.preventDefault();
+            const nis = document.getElementById('add-nis').value.trim();
+            const nama = document.getElementById('add-nama').value.trim();
+            const kelas = document.getElementById('add-kelas').value.trim();
+            
+            if (!nis || !nama || !kelas) {
+                addStudentMessage.textContent = 'Semua field wajib diisi.';
+                addStudentMessage.className = 'text-sm text-center text-red-500';
+                return;
+            }
+
+            const { error } = await supabaseClient.from('Siswa').insert({ nis, nama, kelas });
+
+            if (error) {
+                addStudentMessage.textContent = `Gagal menyimpan: ${error.code === '23505' ? 'NIS sudah terdaftar.' : error.message}`;
+                addStudentMessage.className = 'text-sm text-center text-red-500';
+            } else {
+                addStudentMessage.textContent = 'Siswa berhasil ditambahkan!';
+                addStudentMessage.className = 'text-sm text-center text-green-500';
+                addStudentForm.reset();
+                // Muat ulang data untuk memperbarui semua tampilan
+                const { data } = await supabaseClient.from('Siswa').select('*');
+                allStudentData = data;
+                updateDashboard();
+                renderStudentList();
+            }
+            setTimeout(() => addStudentMessage.textContent = '', 3000);
+        }
+
+        function renderStudentList() {
+            const searchTerm = studentListSearch.value.toLowerCase();
+            const filteredStudents = allStudentData.filter(s => s.nama.toLowerCase().includes(searchTerm));
+            
+            studentListTableBody.innerHTML = '';
+            if (filteredStudents.length === 0) {
+                studentListTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">Tidak ada siswa ditemukan.</td></tr>`;
+                return;
+            }
+
+            filteredStudents.forEach(student => {
+                // Jika siswa ini sedang dalam mode edit
+                if (editingStudentNis === student.nis) {
+                    studentListTableBody.innerHTML += `
+                        <tr class="bg-blue-50">
+                            <td class="px-4 py-2">${student.nis}</td>
+                            <td class="px-4 py-2">${student.nama}</td>
+                            <td class="px-4 py-2">
+                                <input type="text" value="${student.kelas}" id="edit-kelas-${student.nis}" class="w-full px-2 py-1 border border-blue-300 rounded-md">
+                            </td>
+                            <td class="px-4 py-2 text-center space-x-2">
+                                <button data-nis="${student.nis}" class="save-student-btn text-green-600 hover:text-green-800"><i class="fas fa-check"></i></button>
+                                <button class="cancel-edit-btn text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i></button>
+                            </td>
+                        </tr>`;
+                } else {
+                // Mode tampilan normal
+                    studentListTableBody.innerHTML += `
+                        <tr class="border-b hover:bg-gray-50">
+                            <td class="px-4 py-2">${student.nis}</td>
+                            <td class="px-4 py-2">${student.nama}</td>
+                            <td class="px-4 py-2">${student.kelas}</td>
+                            <td class="px-4 py-2 text-center space-x-2">
+                                <button data-nis="${student.nis}" class="edit-student-btn text-blue-600 hover:text-blue-800"><i class="fas fa-pencil-alt"></i></button>
+                                <button data-nis="${student.nis}" data-nama="${student.nama}" class="delete-student-btn text-red-600 hover:text-red-800"><i class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>`;
+                }
+            });
+
+            // Pasang ulang event listener setelah render
+            attachStudentListActionListeners();
+        }
+
+        function attachStudentListActionListeners() {
+            document.querySelectorAll('.edit-student-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                editingStudentNis = e.currentTarget.dataset.nis;
+                renderStudentList();
+            }));
+            document.querySelectorAll('.cancel-edit-btn').forEach(btn => btn.addEventListener('click', () => {
+                editingStudentNis = null;
+                renderStudentList();
+            }));
+            document.querySelectorAll('.save-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                const nis = e.currentTarget.dataset.nis;
+                const newKelas = document.getElementById(`edit-kelas-${nis}`).value.trim();
+                if (!newKelas) return;
+
+                const { error } = await supabaseClient.from('Siswa').update({ kelas: newKelas }).eq('nis', nis);
+                if (error) {
+                    alert('Gagal memperbarui data: ' + error.message);
+                } else {
+                    editingStudentNis = null;
+                    const { data } = await supabaseClient.from('Siswa').select('*');
+                    allStudentData = data;
+                    updateDashboard();
+                    renderStudentList();
+                }
+            }));
+            document.querySelectorAll('.delete-student-btn').forEach(btn => btn.addEventListener('click', async (e) => {
+                const nis = e.currentTarget.dataset.nis;
+                const nama = e.currentTarget.dataset.nama;
+                if (confirm(`Yakin ingin menghapus siswa "${nama}" (NIS: ${nis})?\nSemua data progres membacanya juga akan terhapus.`)) {
+                    const { error } = await supabaseClient.from('Siswa').delete().eq('nis', nis);
+                    if (error) {
+                        alert('Gagal menghapus siswa: ' + error.message);
+                    } else {
+                        // Muat ulang semua data dari awal untuk konsistensi
+                        loadTeacherDashboard();
+                    }
+                }
+            }));
+        }
+
+        // Fungsi Impor Siswa (tidak berubah, hanya dipanggil dari tab)
+        function downloadCSVTemplate() {
+            const headers = "nis,nama,kelas";
+            const csvContent = "data:text/csv;charset=utf-8," + headers;
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "template_siswa_agubi.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function cleanupImportUI() {
+            studentsToImportPreview = [];
+            importPreviewContainer.classList.add('hidden');
+            importCsvInput.value = '';
+        }
+
+        function cancelImportProcess() {
+            cleanupImportUI();
+            importStatus.textContent = "Proses impor dibatalkan.";
+            importStatus.className = 'text-sm mt-2 text-gray-500';
+        }
+
+        function renderImportPreview(students) {
+            let tableHTML = `<table class="w-full text-sm text-left text-gray-500">
+                                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-2">NIS</th>
+                                        <th scope="col" class="px-4 py-2">Nama</th>
+                                        <th scope="col" class="px-4 py-2">Kelas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+            students.forEach(student => {
+                tableHTML += `<tr class="bg-white border-b"><td class="px-4 py-2 font-medium text-gray-900">${student.nis}</td><td class="px-4 py-2">${student.nama}</td><td class="px-4 py-2">${student.kelas}</td></tr>`;
+            });
+            tableHTML += `</tbody></table>`;
+            
+            importPreviewTable.innerHTML = tableHTML;
+            importPreviewContainer.classList.remove('hidden');
+            importStatus.textContent = `${students.length} data siswa siap diimpor.`;
+            importStatus.className = 'text-sm mt-2 text-blue-600';
+        }
+
+        async function confirmAndImportData() {
+            if (studentsToImportPreview.length === 0) {
+                importStatus.textContent = "Tidak ada data untuk diimpor.";
+                importStatus.className = 'text-sm mt-2 text-red-500';
+                return;
+            }
+
+            confirmImportBtn.disabled = true;
+            confirmImportBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Mengimpor...';
+
+            const { error } = await supabaseClient
+                .from('Siswa')
+                .upsert(studentsToImportPreview, { onConflict: 'nis' });
+
+            if (error) {
+                importStatus.textContent = `Error saat impor: ${error.message}`;
+                importStatus.className = 'text-sm mt-2 text-red-500';
+            } else {
+                importStatus.textContent = `Berhasil! ${studentsToImportPreview.length} data siswa berhasil diproses. Memuat ulang dasbor...`;
+                importStatus.className = 'text-sm mt-2 text-green-600';
+                cleanupImportUI();
+                setTimeout(loadTeacherDashboard, 2000); 
+            }
+            confirmImportBtn.disabled = false;
+            confirmImportBtn.innerHTML = '<i class="fa-solid fa-check-circle mr-2"></i> Konfirmasi & Impor';
+        }
+        
+        async function handleImportCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            cleanupImportUI(); 
+            importStatus.textContent = `Membaca file: ${file.name}...`;
+            importStatus.className = 'text-sm mt-2 text-blue-600';
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const text = e.target.result;
+                const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
+                
+                if (lines.length <= 1) {
+                    importStatus.textContent = "Error: File kosong atau hanya berisi header.";
+                    importStatus.className = 'text-sm mt-2 text-red-500';
+                    return;
+                }
+
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                if (headers[0] !== 'nis' || headers[1] !== 'nama' || headers[2] !== 'kelas') {
+                    importStatus.textContent = 'Error: Format header salah. Pastikan kolom adalah: nis,nama,kelas';
+                    importStatus.className = 'text-sm mt-2 text-red-500';
+                    return;
+                }
+                
+                const parsedStudents = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',');
+                    if (values.length === 3 && values[0].trim()) {
+                        parsedStudents.push({
+                            nis: values[0].trim(),
+                            nama: values[1].trim(),
+                            kelas: values[2].trim()
+                        });
+                    }
+                }
+
+                if (parsedStudents.length === 0) {
+                    importStatus.textContent = "Tidak ada data siswa yang valid ditemukan di file.";
+                    importStatus.className = 'text-sm mt-2 text-yellow-600';
+                    return;
+                }
+
+                studentsToImportPreview = parsedStudents;
+                renderImportPreview(studentsToImportPreview);
+            };
+            
+            reader.onerror = () => {
+                 importStatus.textContent = "Gagal membaca file.";
+                 importStatus.className = 'text-sm mt-2 text-red-500';
+            };
+
+            reader.readAsText(file);
+        }
+
+        // ===== Fungsi Manajemen Achievement (Tidak Berubah) =====
+        function renderAchievementManagement() {
+            achievementList.innerHTML = '';
+            awardAchievementSelect.innerHTML = '<option value="">Pilih Achievement</option>';
+            allAchievements.forEach(ach => {
+                const typeLabel = ach.type === 'auto' ? '[Otomatis]' : '[Manual]';
+                achievementList.innerHTML += `
+                    <li class="achievement-item-container bg-gray-50 rounded-lg">
+                        <div class="flex justify-between items-center text-sm p-2 cursor-pointer achievement-item-header" data-id="${ach.id}">
+                            <div>
+                                <span class="font-bold">${ach.emoji || ''} ${ach.nama_achievement}</span> 
+                                <span class="text-xs text-gray-500">${typeLabel}</span>
+                                <p class="text-xs text-gray-600">${ach.kriteria}</p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button data-id="${ach.id}" class="edit-achievement-btn text-blue-500 hover:text-blue-700 z-10 p-1"><i class="fas fa-pencil-alt"></i></button>
+                                <button data-id="${ach.id}" class="delete-achievement-btn text-red-500 hover:text-red-700 z-10 p-1"><i class="fas fa-trash"></i></button>
+                            </div>
+                        </div>
+                        <div class="expandable-content p-2 border-t border-gray-200" data-recipient-list-id="${ach.id}"></div>
+                    </li>`;
+                if (ach.type === 'manual') {
+                    awardAchievementSelect.innerHTML += `<option value="${ach.id}">${ach.emoji} ${ach.nama_achievement}</option>`;
+                }
+            });
+
+            populateAwardStudentSelect();
+
+            document.querySelectorAll('.delete-achievement-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const id = parseInt(e.target.closest('button').dataset.id);
+                    if (confirm('Yakin ingin menghapus achievement ini? Ini juga akan menghapus pencapaian ini dari semua siswa yang telah menerimanya.')) {
+                        const { error } = await supabaseClient.from('Achievements').delete().eq('id', id);
+                        if (error) {
+                            alert('Gagal menghapus achievement: ' + error.message);
+                        } else {
+                            loadTeacherDashboard();
+                        }
+                    }
+                });
+            });
+            
+            document.querySelectorAll('.edit-achievement-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const id = parseInt(e.target.closest('button').dataset.id);
+                    editAchievement(id);
+                });
+            });
+            
+            document.querySelectorAll('.achievement-item-header').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    if (e.target.closest('button')) return;
+                    const id = parseInt(e.currentTarget.dataset.id);
+                    const container = e.currentTarget.closest('.achievement-item-container');
+                    const recipientList = container.querySelector('.expandable-content');
+                    const isShowing = recipientList.classList.contains('show');
+                    document.querySelectorAll('.expandable-content.show').forEach(el => {
+                        if (el !== recipientList) el.classList.remove('show');
+                    });
+                    if (!isShowing) showAchievementRecipients(id, recipientList);
+                    recipientList.classList.toggle('show');
+                });
+            });
+        }
+
+        function populateAwardStudentSelect() {
+            const selectedClass = awardClassSelect.value;
+            const searchTerm = awardStudentSearch.value.toLowerCase();
+            
+            let students = allStudentData;
+            if (selectedClass !== 'semua') {
+                students = students.filter(s => s.kelas === selectedClass);
+            }
+            if (searchTerm) {
+                students = students.filter(s => s.nama.toLowerCase().includes(searchTerm));
+            }
+            
+            awardStudentSelect.innerHTML = '<option value="">Pilih Siswa</option>';
+            students.sort((a,b) => a.nama.localeCompare(b.nama)).forEach(s => {
+                awardStudentSelect.innerHTML += `<option value="${s.nis}">${s.nama} (${s.kelas})</option>`;
+            });
+        }
+        
+        awardClassSelect.addEventListener('change', populateAwardStudentSelect);
+        awardStudentSearch.addEventListener('input', populateAwardStudentSelect);
+
+        function renderCreateAchievementForm() {
+            formAchTitle.textContent = editingAchievementId ? 'Edit Achievement' : 'Buat Achievement Baru';
+            if(currentAchievementForm === 'manual') {
+                createAchievementForm.innerHTML = `<input type="text" id="achievement-emoji" placeholder="Emoji (cth: ✨)" class="w-full px-3 py-2 border rounded-lg"><input type="text" id="achievement-image-url" placeholder="ATAU URL Gambar (opsional)" class="w-full px-3 py-2 border rounded-lg"><input type="text" id="achievement-name" placeholder="Nama Achievement" class="w-full px-3 py-2 border rounded-lg" required><textarea id="achievement-criteria" placeholder="Kriteria Pencapaian" class="w-full px-3 py-2 border rounded-lg" rows="2" required></textarea><button type="submit" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg">${editingAchievementId ? 'Update' : 'Buat'} Achievement Manual</button>${editingAchievementId ? '<button type="button" id="cancel-edit-btn" class="w-full mt-2 bg-gray-500 text-white font-bold py-2 rounded-lg">Batal</button>' : ''}`;
+            } else { // auto
+                createAchievementForm.innerHTML = `<input type="text" id="achievement-emoji" placeholder="Emoji (cth: ✨)" class="w-full px-3 py-2 border rounded-lg"><input type="text" id="achievement-image-url" placeholder="ATAU URL Gambar (opsional)" class="w-full px-3 py-2 border rounded-lg"><input type="text" id="achievement-name" placeholder="Nama Achievement" class="w-full px-3 py-2 border rounded-lg" required><select id="achievement-condition-type" class="w-full px-3 py-2 border rounded-lg"><option value="single_book_pages">Halaman dalam 1 Laporan</option><option value="total_pages_overall">Total Halaman Dibaca</option></select><input type="number" id="achievement-condition-value" placeholder="Nilai (cth: 150)" class="w-full px-3 py-2 border rounded-lg" required><textarea id="achievement-criteria" placeholder="Kriteria Pencapaian" class="w-full px-3 py-2 border rounded-lg" rows="2" required></textarea><button type="submit" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg">${editingAchievementId ? 'Update' : 'Buat'} Achievement Otomatis</button>${editingAchievementId ? '<button type="button" id="cancel-edit-btn" class="w-full mt-2 bg-gray-500 text-white font-bold py-2 rounded-lg">Batal</button>' : ''}`;
+            }
+
+            if(editingAchievementId) {
+                document.getElementById('cancel-edit-btn').addEventListener('click', cancelEditAchievement);
+            }
+        }
+
+        manualAchTab.addEventListener('click', () => {
+            if (editingAchievementId) return;
+            currentAchievementForm = 'manual';
+            manualAchTab.classList.add('bg-white', 'shadow', 'text-blue-600', 'font-semibold');
+            autoAchTab.classList.remove('bg-white', 'shadow', 'text-blue-600', 'font-semibold');
+            autoAchTab.classList.add('text-gray-500');
+            renderCreateAchievementForm();
+        });
+        autoAchTab.addEventListener('click', () => {
+            if (editingAchievementId) return;
+            currentAchievementForm = 'auto';
+            autoAchTab.classList.add('bg-white', 'shadow', 'text-blue-600', 'font-semibold');
+            manualAchTab.classList.remove('bg-white', 'shadow', 'text-blue-600', 'font-semibold');
+            manualAchTab.classList.add('text-gray-500');
+            renderCreateAchievementForm();
+        });
+
+        createAchievementForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const achievementData = {
+                emoji: document.getElementById('achievement-emoji').value,
+                gambar_url: document.getElementById('achievement-image-url').value,
+                nama_achievement: document.getElementById('achievement-name').value,
+                kriteria: document.getElementById('achievement-criteria').value,
+                type: currentAchievementForm,
+            };
+            if (currentAchievementForm === 'auto') {
+                achievementData.condition_type = document.getElementById('achievement-condition-type').value;
+                achievementData.condition_value = parseInt(document.getElementById('achievement-condition-value').value);
+            }
+
+            if (editingAchievementId) {
+                await supabaseClient.from('Achievements').update(achievementData).eq('id', editingAchievementId);
+            } else {
+                await supabaseClient.from('Achievements').insert(achievementData);
+            }
+            
+            cancelEditAchievement();
+            loadTeacherDashboard();
+        });
+        
+        function editAchievement(id) {
+            editingAchievementId = id;
+            const ach = allAchievements.find(a => a.id === id);
+            if (!ach) return;
+
+            currentAchievementForm = ach.type;
+            if (ach.type === 'manual') {
+                manualAchTab.click();
+            } else {
+                autoAchTab.click();
+            }
+            
+            renderCreateAchievementForm();
+            
+            document.getElementById('achievement-emoji').value = ach.emoji || '';
+            document.getElementById('achievement-image-url').value = ach.gambar_url || '';
+            document.getElementById('achievement-name').value = ach.nama_achievement;
+            document.getElementById('achievement-criteria').value = ach.kriteria;
+            if (ach.type === 'auto') {
+                document.getElementById('achievement-condition-type').value = ach.condition_type;
+                document.getElementById('achievement-condition-value').value = ach.condition_value;
+            }
+        }
+        
+        function cancelEditAchievement() {
+            editingAchievementId = null;
+            createAchievementForm.reset();
+            renderCreateAchievementForm();
+        }
+
+        awardAchievementForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nis = awardStudentSelect.value;
+            const achievementId = parseInt(awardAchievementSelect.value);
+            awardMessage.textContent = 'Memberikan...';
+            
+            const { error } = await supabaseClient.from('PencapaianSiswa').insert({ nis_siswa: nis, achievement_id: achievementId });
+            if (error) {
+                awardMessage.textContent = 'Gagal: ' + (error.code === '23505' ? 'Siswa sudah punya badge ini.' : error.message);
+                awardMessage.className = 'text-sm text-center text-red-500';
+            } else {
+                awardMessage.textContent = 'Achievement berhasil diberikan!';
+                awardMessage.className = 'text-sm text-center text-green-500';
+                awardAchievementForm.reset();
+                const { data } = await supabaseClient.from('PencapaianSiswa').select('*');
+                allPencapaianSiswa = data;
+            }
+            setTimeout(() => awardMessage.textContent = '', 3000);
+        });
+
+        async function checkAndAwardAutomaticAchievements(nis, newProgress) {
+            const { data: autoAchievements } = await supabaseClient.from('Achievements').select('*').eq('type', 'auto');
+            const { data: studentAchievementsData } = await supabaseClient.from('PencapaianSiswa').select('achievement_id').eq('nis_siswa', nis);
+            const studentAchievements = studentAchievementsData.map(p => p.achievement_id);
+            const { data: studentTotalProgress } = await supabaseClient.from('ProgresBaca').select('halaman_dibaca').eq('nis_siswa', nis);
+            
+            for (const ach of autoAchievements) {
+                if (studentAchievements.includes(ach.id)) continue;
+                let conditionMet = false;
+                if (ach.condition_type === 'single_book_pages') {
+                    if (newProgress.halaman_dibaca >= ach.condition_value) conditionMet = true;
+                } else if (ach.condition_type === 'total_pages_overall') {
+                    const totalPages = studentTotalProgress.reduce((sum, p) => sum + p.halaman_dibaca, 0);
+                    if (totalPages >= ach.condition_value) conditionMet = true;
+                }
+                if (conditionMet) {
+                    const { data, error } = await supabaseClient.from('PencapaianSiswa').insert({ nis_siswa: nis, achievement_id: ach.id }).select().single();
+                    if (!error && data) {
+                        newAchievementToast.innerHTML = `Selamat! Kamu membuka achievement: <strong>${ach.nama_achievement}</strong>`;
+                        newAchievementToast.classList.remove('hidden');
+                    }
+                }
+            }
+        }
+
+        async function showAchievementRecipients(achievementId, container) {
+            const { data, error } = await supabaseClient.from('PencapaianSiswa').select('id, Siswa (nama, kelas)').eq('achievement_id', achievementId);
+            if (error) { console.error(error); return; }
+
+            container.innerHTML = '';
+            if (data.length > 0) {
+                const groupedByClass = data.reduce((acc, p) => {
+                    const student = p.Siswa;
+                    if(student) (acc[student.kelas] = acc[student.kelas] || []).push({id: p.id, ...student});
+                    return acc;
+                }, {});
+
+                for (const kelas in groupedByClass) {
+                    container.innerHTML += `<h4 class="font-semibold text-sm mt-2">${kelas}</h4>`;
+                    const studentList = groupedByClass[kelas].map(s => `<li class="flex justify-between items-center text-xs p-1"><span>${s.nama}</span><button data-id="${s.id}" class="revoke-achievement-btn text-red-400 hover:text-red-600 p-1"><i class="fas fa-times"></i></button></li>`).join('');
+                    container.innerHTML += `<ul class="pl-2">${studentList}</ul>`;
+                }
+                
+                container.querySelectorAll('.revoke-achievement-btn').forEach(btn => {
+                    btn.addEventListener('click', async e => {
+                        e.stopPropagation();
+                        const idToRemove = parseInt(e.target.closest('button').dataset.id);
+                        const {error} = await supabaseClient.from('PencapaianSiswa').delete().eq('id', idToRemove);
+                        if(error) { alert('Gagal mencabut achievement: ' + error.message); }
+                        else {
+                            const { data } = await supabaseClient.from('PencapaianSiswa').select('*');
+                            allPencapaianSiswa = data;
+                            showAchievementRecipients(achievementId, container);
+                        }
+                    });
+                });
+            } else {
+                container.innerHTML = `<p class="p-2 text-xs text-gray-500">Belum ada penerima.</p>`;
+            }
+        }
+
+        function showDbError() {
+            appContainer.innerHTML = `
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg shadow-md max-w-2xl mx-auto">
+                    <h2 class="font-bold text-xl mb-2">Kesalahan Database: Tabel Tidak Ditemukan!</h2>
+                    <p class="mb-4">Aplikasi tidak dapat terhubung ke tabel yang dibutuhkan. Kemungkinan besar Anda belum menjalankan skrip SQL untuk membuat struktur database, atau ada kesalahan pada nama tabel.</p>
+                    <p class="font-semibold mb-2">Langkah Perbaikan:</p>
+                    <ol class="list-decimal list-inside space-y-2 text-sm">
+                        <li>Buka proyek Supabase Anda dan pergi ke <strong>SQL Editor</strong>.</li>
+                        <li>Klik <strong>+ New query</strong>.</li>
+                        <li>Salin semua kode di bawah ini dan tempel ke editor.</li>
+                        <li>Klik tombol <strong>RUN</strong>.</li>
+                    </ol>
+                    <pre class="bg-gray-800 text-white p-4 rounded-lg mt-4 text-xs overflow-x-auto"><code>${getSqlScript()}</code></pre>
+                </div>
+            `;
+        }
+
+        function getSqlScript() {
+            return `
+CREATE TABLE public.Siswa (
+  nis TEXT PRIMARY KEY,
+  nama TEXT NOT NULL,
+  kelas TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public.ProgresBaca (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+  nis_siswa TEXT NOT NULL REFERENCES public.Siswa(nis) ON DELETE CASCADE,
+  judul_buku TEXT NOT NULL,
+  halaman_awal BIGINT NOT NULL,
+  halaman_akhir BIGINT NOT NULL,
+  halaman_dibaca BIGINT NOT NULL,
+  deskripsi TEXT NOT NULL
+);
+
+CREATE TABLE public.Achievements (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  emoji TEXT,
+  gambar_url TEXT,
+  nama_achievement TEXT NOT NULL,
+  kriteria TEXT,
+  type TEXT NOT NULL,
+  condition_type TEXT,
+  condition_value BIGINT,
+  created_at TIMESTAMPTZ DEFAULT now() NOT NULL
+);
+
+CREATE TABLE public.PencapaianSiswa (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  nis_siswa TEXT NOT NULL REFERENCES public.Siswa(nis) ON DELETE CASCADE,
+  achievement_id BIGINT NOT NULL REFERENCES public.Achievements(id) ON DELETE CASCADE,
+  tanggal_diberikan TIMESTAMPTZ DEFAULT now() NOT NULL,
+  UNIQUE(nis_siswa, achievement_id)
+);
+
+ALTER TABLE public.Siswa ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ProgresBaca ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.Achievements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.PencapaianSiswa ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read on Siswa" ON public.Siswa FOR SELECT USING (true);
+CREATE POLICY "Allow public read on Achievements" ON public.Achievements FOR SELECT USING (true);
+CREATE POLICY "Allow public read on PencapaianSiswa" ON public.PencapaianSiswa FOR SELECT USING (true);
+CREATE POLICY "Allow public read on ProgresBaca" ON public.ProgresBaca FOR SELECT USING (true);
+CREATE POLICY "Allow anyone to insert progress" ON public.ProgresBaca FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow full control for authenticated users on Siswa" ON public.Siswa FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow full control for authenticated users on Achievements" ON public.Achievements FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow anonymous insert on PencapaianSiswa" ON public.PencapaianSiswa FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow authenticated delete on PencapaianSiswa" ON public.PencapaianSiswa FOR DELETE USING (auth.role() = 'authenticated');
+            `.trim();
+        }
+        
+        // Inisialisasi awal
+        document.addEventListener('DOMContentLoaded', () => {
+            if (SUPABASE_URL.includes('URL_ANDA') || SUPABASE_ANON_KEY.includes('KEY_ANDA')) {
+                appContainer.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-6 rounded-lg shadow-md"><h2 class="font-bold text-xl mb-2">Konfigurasi Belum Selesai!</h2><p>Harap isi variabel <strong>SUPABASE_URL</strong> dan <strong>SUPABASE_ANON_KEY</strong> di dalam kode dengan kredensial dari proyek Supabase Anda.</p></div>`;
+            } else {
+                supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                checkUserSession();
+            }
+        });
+
+    </script>
+</body>
+</html>
