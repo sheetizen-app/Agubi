@@ -110,7 +110,9 @@
         const importPreviewContainer = document.getElementById('import-preview-container');
         const importPreviewTable = document.getElementById('import-preview-table');
 
+
         const importSchoolIdDisplay = document.getElementById('import-school-id');
+
         const confirmImportBtn = document.getElementById('confirm-import-btn');
         const cancelImportBtn = document.getElementById('cancel-import-btn');
         const reviewListContainer = document.getElementById('review-list-container');
@@ -152,6 +154,9 @@
         
         // --- Alur Utama Aplikasi & Autentikasi ---
         async function initializeApp() {
+
+            supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 
             supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
                 auth: {
@@ -924,8 +929,8 @@
             studentsToImportPreview = [];
             importPreviewContainer.classList.add('hidden');
             importCsvInput.value = '';
-            importSchoolIdDisplay.textContent = '';
 
+            importSchoolIdDisplay.textContent = '';
         }
 
         function cancelImportProcess() {
@@ -936,13 +941,13 @@
 
         function renderImportPreview(students) {
 
-            importSchoolIdDisplay.textContent = `Sekolah ID: ${currentSekolahId || 'N/A'}`;
-
 
             importSchoolIdDisplay.textContent = `Sekolah ID: ${currentSekolahId || 'N/A'}`;
 
+
             importSchoolIdDisplay.textContent = `Sekolah ID: ${currentSekolahId || 'N/A'}`;
 
+            importSchoolIdDisplay.textContent = `Sekolah ID: ${currentSekolahId || 'N/A'}`;
 
             let tableHTML = `<table class="w-full text-sm text-left text-gray-500"><thead class="text-xs text-gray-700 uppercase bg-gray-50"><tr><th scope="col" class="px-4 py-2">NIS</th><th scope="col" class="px-4 py-2">Nama</th><th scope="col" class="px-4 py-2">Kelas</th></tr></thead><tbody>`;
             students.forEach(student => {
@@ -970,7 +975,7 @@
                 importStatus.className = 'text-sm mt-2 text-red-500';
                 console.error("Gagal impor karena currentSekolahId bernilai null.");
                 return;
-            }
+
             console.log('currentSekolahId before import', currentSekolahId);
 
             confirmImportBtn.disabled = true;
@@ -1035,10 +1040,14 @@
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const text = e.target.result;
+
+                const lines = text.replace(/^\uFEFF/, '').split(/\r\n|\n/).filter(line => line.trim() !== '');
+
                 const lines = text
                     .replace(/^\uFEFF/, '')
                     .split(/\r\n|\n|\r/)
                     .filter(line => line.trim() !== '');
+
                 
                 if (lines.length <= 1) {
                     importStatus.textContent = "Error: File kosong atau hanya berisi header.";
@@ -1088,12 +1097,15 @@
                  importStatus.className = 'text-sm mt-2 text-red-500';
             };
 
+            reader.readAsText(file, 'UTF-8');
+
 
             reader.readAsText(file, 'UTF-8');
 
 
             reader.readAsText(file, 'UTF-8')
             reader.readAsText(file);
+
 
 
         }
